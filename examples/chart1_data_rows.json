@@ -1,0 +1,8 @@
+[
+  {"month": "Jan", "apples": 10, "oranges": 8},
+  {"month": "Feb", "apples": 14, "oranges": 9},
+  {"month": "Mar", "apples": 18, "oranges": 12},
+  {"month": "Apr", "apples": 15, "oranges": 12},
+  {"month": "May", "apples": 22, "oranges": 10},
+  {"month": "Jun", "apples": 27, "oranges": 11}
+]

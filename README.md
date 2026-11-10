@@ -25,7 +25,8 @@ language: what matches, what conflicts, and what is missing.
 ## Run the examples
 
 ```
-python3 checker.py
+python3 checker.py                              # built-in examples
+python3 checker.py <data_file> <description_file>
 ```
 
 ## Status

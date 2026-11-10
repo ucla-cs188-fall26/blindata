@@ -1,0 +1,90 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "description": "Fruit sales, January to June",
+  "data": {
+    "values": [
+      {
+        "month": "Jan",
+        "fruit": "apples",
+        "sold": 10
+      },
+      {
+        "month": "Jan",
+        "fruit": "oranges",
+        "sold": 8
+      },
+      {
+        "month": "Feb",
+        "fruit": "apples",
+        "sold": 14
+      },
+      {
+        "month": "Feb",
+        "fruit": "oranges",
+        "sold": 9
+      },
+      {
+        "month": "Mar",
+        "fruit": "apples",
+        "sold": 18
+      },
+      {
+        "month": "Mar",
+        "fruit": "oranges",
+        "sold": 12
+      },
+      {
+        "month": "Apr",
+        "fruit": "apples",
+        "sold": 15
+      },
+      {
+        "month": "Apr",
+        "fruit": "oranges",
+        "sold": 12
+      },
+      {
+        "month": "May",
+        "fruit": "apples",
+        "sold": 22
+      },
+      {
+        "month": "May",
+        "fruit": "oranges",
+        "sold": 10
+      },
+      {
+        "month": "Jun",
+        "fruit": "apples",
+        "sold": 27
+      },
+      {
+        "month": "Jun",
+        "fruit": "oranges",
+        "sold": 11
+      }
+    ]
+  },
+  "mark": "bar",
+  "encoding": {
+    "x": {
+      "field": "month",
+      "type": "nominal",
+      "sort": null
+    },
+    "y": {
+      "field": "sold",
+      "type": "quantitative",
+      "axis": {
+        "title": "units"
+      }
+    },
+    "color": {
+      "field": "fruit",
+      "type": "nominal"
+    },
+    "xOffset": {
+      "field": "fruit"
+    }
+  }
+}

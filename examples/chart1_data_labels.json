@@ -1,0 +1,8 @@
+{
+  "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+  "series": {
+    "apples":  [10, 14, 18, 15, 22, 27],
+    "oranges": [8, 9, 12, 12, 10, 11]
+  },
+  "unit": "units"
+}
