@@ -11,6 +11,38 @@ function markActivated(button) {
   button.classList.add('is-last-activated');
 }
 
+function findingButtonLabel(finding) {
+  const subjects = {
+    maximum: 'peak claim',
+    trend: 'trend claim',
+    value: 'reported number',
+    unit: 'stated unit',
+    claim: 'claim',
+  };
+  const subject = subjects[finding.kind] || 'claim';
+  const about = finding.series ? ` for ${finding.series}` : '';
+  let action;
+  switch (finding.status) {
+    case 'contradicted':
+      action = `See why the ${subject}${about} conflicts with the data.`;
+      break;
+    case 'verified':
+      action = `See how the ${subject}${about} matches the data.`;
+      break;
+    case 'unverifiable':
+      action = `See why the data cannot verify this ${subject}${about}.`;
+      break;
+    case 'missing':
+      action = finding.series
+        ? `See why ${finding.series} is listed as missing from the description.`
+        : 'See which data series the description leaves out.';
+      break;
+    default:
+      action = 'Explore this finding and its source evidence.';
+  }
+  return `${finding.id}. ${action}`;
+}
+
 // Delegation also covers finding buttons created after verification.
 document.addEventListener('click', (event) => {
   markActivated(event.target.closest('button'));
@@ -82,7 +114,7 @@ el('verify-form').addEventListener('submit', async (event) => {
     for (const finding of payload.findings) {
       const button = document.createElement('button');
       button.type = 'button';
-      button.textContent = `Inspect ${finding.id}: ${finding.status}, ${finding.kind}`;
+      button.textContent = findingButtonLabel(finding);
       button.addEventListener('click', () => ask(`inspect ${finding.id}`));
       parent.appendChild(button);
     }
