@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blindata — Interactive Evidence Explorer</title>
+  <style>
+    body {font: 1rem/1.55 system-ui, -apple-system, sans-serif; max-width: 56rem; margin: 2rem auto; padding: 0 1rem; color: #202020; background: #fff}
+    label {display: block; font-weight: 650; margin: 1rem 0 .35rem}
+    input, select, textarea, button {font: inherit}
+    input, select, textarea {box-sizing: border-box; width: 100%; border: 2px solid #777; border-radius: .25rem; padding: .5rem}
+    button {cursor: pointer; background: #1249a6; color: white; border: 2px solid #1249a6; border-radius: .25rem; padding: .45rem .8rem; margin: .35rem .35rem .35rem 0}
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {outline: 4px solid #f39c12; outline-offset: 2px}
+    fieldset {border: 1px solid #777; margin-top: 1.5rem; padding: 1rem}
+    legend {font-weight: bold}
+    #answer {white-space: pre-wrap; overflow-wrap: anywhere; background: #f4f5f7; padding: 1rem; border-radius: .25rem}
+    table {border-collapse: collapse; width: 100%; margin: 1rem 0}
+    th, td {border: 1px solid #777; padding: .5rem; text-align: left}
+    .note {color: #444}
+    [hidden] {display:none!important}
+  </style>
+  <script defer src="/static/agent_ui.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Blindata: Interactive Evidence Explorer</h1>
+    <p>Check an accessible chart description using the existing Blindata constraint checker, then investigate the findings with source data. This prototype uses an LLM with read-only data tools when the server is configured with an API key. Otherwise it uses offline rule-based commands.</p>
+    <p class="note"><strong>Privacy:</strong> The checker runs locally. In LLM mode, user questions and selected chart descriptions or source values returned by the tools are sent to the configured OpenAI API. Do not enter confidential data for classroom demonstrations.</p>
+    <form id="verify-form">
+      <fieldset>
+        <legend>1. Provide reference data and a description</legend>
+        <label for="format">Data format</label>
+        <select id="format" name="format">
+          <option value="csv">CSV</option>
+          <option value="tsv">TSV</option>
+          <option value="json">JSON</option>
+          <option value="txt">Pasted table text</option>
+        </select>
+        <label for="data">Reference chart data</label>
+        <textarea id="data" name="data" rows="6" required>Month,Sales
+Jan,100
+Feb,120
+Mar,90
+Apr,150</textarea>
+        <label for="description">Accessible description</label>
+        <textarea id="description" name="description" rows="3" required>Sales peak in March. Sales rise overall.</textarea>
+        <button type="submit">Run verification</button>
+      </fieldset>
+    </form>
+    <section id="explorer" hidden aria-labelledby="explore-title">
+      <h2 id="explore-title">2. Explore verification results</h2>
+      <p class="note">Use the finding buttons or ask a follow-up question. All answers reference the same data used by the checker.</p>
+      <div id="finding-buttons" aria-label="Findings"></div>
+      <form id="ask-form">
+        <label for="question">Your question</label>
+        <input id="question" name="question" type="text" placeholder="Why 1? Compare Feb and Mar." autocomplete="off">
+        <button type="submit">Ask</button>
+        <button id="summary-button" type="button">Show summary</button>
+        <button id="source-button" type="button">Show evidence</button>
+        <button id="correction-button" type="button">Suggested description</button>
+      </form>
+      <p id="agent-mode" class="note" aria-live="polite"></p>
+      <h3>Response</h3>
+      <div id="answer" role="status" aria-live="polite" aria-atomic="true"></div>
+      <section id="evidence-section" hidden aria-labelledby="evidence-title">
+        <h3 id="evidence-title">Source data evidence</h3>
+        <table>
+          <caption>Data points returned by the evidence agent</caption>
+          <thead><tr><th scope="col">Row</th><th scope="col">Category</th><th scope="col">Series</th><th scope="col">Value</th></tr></thead>
+          <tbody id="evidence-rows"></tbody>
+        </table>
+      </section>
+    </section>
+    <p id="error" role="alert"></p>
+  </main>
+</body>
+</html>

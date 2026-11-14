@@ -29,6 +29,33 @@ python3 checker.py                              # built-in examples
 python3 checker.py <data_file> <description_file>
 ```
 
-## Status
+## Interactive evidence explorer
+
+Requires Python 3.9 or newer; uses only the Python standard library.
+Start the local web interface from the repository directory:
+
+```bash
+BLINDATA_AGENT_MODE=rules python3 agent_web.py
+```
+
+Open http://127.0.0.1:8765, submit the sample data and description, then
+inspect a finding or ask `compare sales February and March`.
+Offline mode works without an API key.
+
+For LLM follow-up questions, set `OPENAI_API_KEY` in the server environment
+and run `BLINDATA_AGENT_MODE=llm python3 agent_web.py`.
+See [README_AGENT.md](README_AGENT.md) for configuration, the terminal interface,
+data handling, and limitations. Never put API keys in browser code or Git.
+
+Run all offline tests, including the local HTTP integration tests:
+
+```bash
+python3 -m unittest discover -v
+```
+
+The LLM tests simulate API responses; a live LLM call requires an API key
+and access to the configured model.
+
+## Prototype status
 
 Skeleton for Core Assignment 3 (first prototype). Demo: Nov 17.
