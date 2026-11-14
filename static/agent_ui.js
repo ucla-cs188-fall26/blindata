@@ -3,6 +3,19 @@ let sessionId = null;
 const el = (id) => document.getElementById(id);
 const error = el('error');
 
+function markActivated(button) {
+  if (!button) return;
+  document.querySelectorAll('button.is-last-activated').forEach((previous) => {
+    previous.classList.remove('is-last-activated');
+  });
+  button.classList.add('is-last-activated');
+}
+
+// Delegation also covers finding buttons created after verification.
+document.addEventListener('click', (event) => {
+  markActivated(event.target.closest('button'));
+});
+
 async function post(path, payload) {
   const response = await fetch(path, {
     method: 'POST',
@@ -49,6 +62,7 @@ async function ask(question) {
 
 el('verify-form').addEventListener('submit', async (event) => {
   event.preventDefault();
+  markActivated(event.submitter || el('verify-form').querySelector('button[type="submit"]'));
   error.textContent = '';
   sessionId = null;
   try {
@@ -81,6 +95,7 @@ el('verify-form').addEventListener('submit', async (event) => {
 
 el('ask-form').addEventListener('submit', (event) => {
   event.preventDefault();
+  markActivated(event.submitter || el('ask-form').querySelector('button[type="submit"]'));
   ask(el('question').value);
 });
 el('summary-button').addEventListener('click', () => ask('summary'));
