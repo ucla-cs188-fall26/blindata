@@ -122,7 +122,7 @@ On macOS or Linux:
 ```bash
 export OPENAI_API_KEY='replace-with-your-api-key'
 export BLINDATA_AGENT_MODE=llm
-export BLINDATA_LLM_MODEL=gpt-4.1-mini
+export BLINDATA_LLM_MODEL=gpt-6-luna
 python3 agent_web.py
 ```
 
@@ -131,7 +131,7 @@ On Windows PowerShell:
 ```powershell
 $env:OPENAI_API_KEY = 'replace-with-your-api-key'
 $env:BLINDATA_AGENT_MODE = 'llm'
-$env:BLINDATA_LLM_MODEL = 'gpt-4.1-mini'
+$env:BLINDATA_LLM_MODEL = 'gpt-6-luna'
 python agent_web.py
 ```
 
@@ -141,6 +141,11 @@ These settings apply to the current terminal session. Refresh the page, click
 - `Why is the peak claim wrong?`
 - `Did sales increase continuously? Show the evidence.`
 - `Compare sales February and March.`
+
+If you previously exported another `BLINDATA_LLM_MODEL`, update it to
+`gpt-6-luna` and restart the server; an environment override takes priority over
+the code default. Luna requests use `reasoning.effort=none` for brief answers
+within the existing output budget. See the [model documentation](https://developers.openai.com/api/docs/models/gpt-6-luna).
 
 The initial checker still runs locally. For follow-up questions, the model
 chooses read-only tools; the server retrieves or computes evidence from the
@@ -157,7 +162,7 @@ permitted to send. If the model is unavailable, the app reports the failure.
 | `BLINDATA_AGENT_MODE=llm` | Requires a key for follow-up answers. |
 | `BLINDATA_AGENT_MODE=auto` | Default: uses LLM if a key exists, otherwise offline commands. |
 | `OPENAI_API_KEY` | API key used by the Python backend. |
-| `BLINDATA_LLM_MODEL` | Model name; defaults to `gpt-4.1-mini`. Must be accessible to your API project. |
+| `BLINDATA_LLM_MODEL` | Model name; defaults to `gpt-6-luna`. Must be accessible to your API project. |
 
 ## 6. Use the checker and agent in the terminal
 

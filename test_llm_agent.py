@@ -107,6 +107,22 @@ class LLMAgentTests(unittest.TestCase):
         self.assertEqual(transport.requests[1]["input"][-1]["type"], "function_call_output")
         self.assertIn("-25.0", transport.requests[1]["input"][-1]["output"])
 
+    def test_default_luna_and_model_overrides(self):
+        with patch.dict(os.environ, {}, clear=True):
+            transport = FakeTransport([message_response("No tool selected.")])
+            agent = LLMEvidenceAgent(self.base, transport=transport)
+            agent.ask("Show evidence")
+            self.assertEqual(transport.requests[0]["model"], "gpt-6-luna")
+            self.assertEqual(transport.requests[0]["reasoning"], {"effort": "none"})
+        with patch.dict(os.environ, {"BLINDATA_LLM_MODEL": "custom-model"}, clear=True):
+            transport = FakeTransport([message_response("No tool selected.")])
+            agent = LLMEvidenceAgent(self.base, transport=transport)
+            agent.ask("Show evidence")
+            self.assertEqual(transport.requests[0]["model"], "custom-model")
+            self.assertNotIn("reasoning", transport.requests[0])
+            explicit = LLMEvidenceAgent(self.base, transport=transport, model="explicit-model")
+            self.assertEqual(explicit.model, "explicit-model")
+
     def test_follow_up_uses_previous_conversation_and_active_finding(self):
         transport = FakeTransport([
             call_response("inspect_finding", {"finding_id": 2}),

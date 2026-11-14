@@ -180,7 +180,7 @@ class LLMEvidenceAgent:
                  model: str | None = None, max_rounds: int = 4):
         self.evidence_agent = evidence_agent
         self.transport = transport or ResponsesTransport(os.environ.get("OPENAI_API_KEY", ""))
-        self.model = model or os.getenv("BLINDATA_LLM_MODEL", "gpt-4.1-mini")
+        self.model = model or os.getenv("BLINDATA_LLM_MODEL", "gpt-6-luna")
         self.max_rounds = max_rounds
         self.history: list[dict[str, str]] = []
         self.lock = threading.RLock()
@@ -288,6 +288,9 @@ class LLMEvidenceAgent:
             last_finding = None
             tool_texts: list[str] = []
             final_text = ""
+            # Luna supports no-reasoning mode for brief, low-cost evidence answers.
+            # Keep overrides compatible with models that lack this parameter.
+            model_options = {"reasoning": {"effort": "none"}} if self.model == "gpt-6-luna" else {}
             for round_index in range(self.max_rounds):
                 response = self.transport.create(
                     model=self.model, instructions=SYSTEM_INSTRUCTIONS +
@@ -297,6 +300,7 @@ class LLMEvidenceAgent:
                     input=input_items, tools=TOOLS,
                     tool_choice="required" if round_index == 0 else "auto",
                     parallel_tool_calls=False, store=False, max_output_tokens=650,
+                    **model_options,
                 )
                 outputs = response["output"]
                 calls = [item for item in outputs if item.get("type") == "function_call"]
