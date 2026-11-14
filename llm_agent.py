@@ -22,6 +22,36 @@ class LLMServiceError(RuntimeError):
     """Remote model configuration, transport or protocol error."""
 
 
+def _http_error_message(exc: HTTPError) -> str:
+    """Translate known API codes without exposing response text or submitted data."""
+    prefix = f"OpenAI API returned HTTP {exc.code}."
+    if exc.code != 429:
+        return prefix
+    try:
+        payload = json.loads(exc.read(65536))
+        error = payload.get("error", {}) if isinstance(payload, dict) else {}
+        if not isinstance(error, dict):
+            error = {}
+    except (ValueError, OSError):
+        error = {}
+    remedies = {
+        "credit_balance_exhausted": "No prepaid API credits remain. Add credits in OpenAI Platform Billing before retrying.",
+        "organization_spend_limit_exceeded": "The organization API spend limit was reached. Review organization limits before retrying.",
+        "project_spend_limit_exceeded": "The project API spend limit was reached. Review this project's limits before retrying.",
+        "organization_usage_limit_exceeded": "The organization API usage limit was reached. Request a higher usage limit before retrying.",
+        "insufficient_quota": "API quota is unavailable. Check API credits, billing, and project/organization limits before retrying.",
+        "rate_limit_exceeded": "The API request or token rate limit was reached. Wait before retrying and reduce request frequency; check model limits.",
+        "slow_down": "The API request rate increased too quickly. Wait before retrying and reduce request frequency.",
+    }
+    code = error.get("code")
+    # Prefer the specific billing code over the broader insufficient_quota type.
+    if not isinstance(code, str) or code not in remedies:
+        code = "insufficient_quota" if error.get("type") == "insufficient_quota" else None
+    if code:
+        return f"{prefix} {code}: {remedies[code]}"
+    return prefix + " Check OpenAI Platform Billing and Limits: this may be a quota/billing issue or a temporary rate limit."
+
+
 class ResponsesTransport:
     """Minimal, dependency-free OpenAI Responses API client."""
 
@@ -42,8 +72,7 @@ class ResponsesTransport:
             with urlopen(request, timeout=self.timeout) as response:
                 result = json.load(response)
         except HTTPError as exc:
-            # Do not echo response bodies: they can contain raw submitted data.
-            raise LLMServiceError(f"OpenAI API returned HTTP {exc.code}.") from exc
+            raise LLMServiceError(_http_error_message(exc)) from exc
         except (URLError, TimeoutError, OSError) as exc:
             raise LLMServiceError("Could not reach the LLM service.") from exc
         if not isinstance(result, dict) or not isinstance(result.get("output"), list):

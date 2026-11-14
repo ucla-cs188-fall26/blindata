@@ -69,6 +69,19 @@ The tool dispatcher validates label and series names against the reference datas
 
 ## Privacy, safety and limitations
 
+### Troubleshooting HTTP 429
+
+The client distinguishes known API error codes without displaying raw API error
+messages or submitted chart content. `insufficient_quota` and
+`credit_balance_exhausted` require checking credits and billing;
+`project_spend_limit_exceeded`, `organization_spend_limit_exceeded`, and
+`organization_usage_limit_exceeded` require reviewing the corresponding limits.
+Repeated retries do not fix these account issues. `rate_limit_exceeded` and
+`slow_down` indicate temporary rate limits: wait and reduce request frequency.
+See the [official API error guide](https://developers.openai.com/api/docs/guides/error-codes).
+
+### Data handling
+
 - The initial checker runs locally. LLM mode sends **user questions and any chart information returned by requested tools** to the OpenAI API. Do not submit sensitive datasets without appropriate permission. Requests set `store=false` and do not persist API conversation state remotely through this client.
 - The API key remains in the Python process environment, not browser scripts. For a public deployment, add authentication, CSRF protection, rate limiting, per-user sessions, and a production web server. This demo binds to `127.0.0.1` only.
 - A bounded recent dialogue history is kept **in memory** per session and cleared when the local server stops.

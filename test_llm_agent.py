@@ -1,11 +1,58 @@
 """Offline tests for the LLM tool-calling orchestration; no network key is needed."""
 import json
+import io
 import os
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 from interactive_agent import EvidenceAgent
-from llm_agent import LLMEvidenceAgent, LLMServiceError, _unbacked_numbers
+from llm_agent import LLMEvidenceAgent, LLMServiceError, ResponsesTransport, _unbacked_numbers
+
+
+class ResponsesTransportTests(unittest.TestCase):
+    def fail_request(self, body):
+        error = HTTPError("https://api.openai.com/v1/responses", 429, "Too Many Requests", {}, io.BytesIO(body))
+        with patch("llm_agent.urlopen", side_effect=error) as request:
+            with self.assertRaises(LLMServiceError) as caught:
+                ResponsesTransport("test-key").create(model="test-model", input="test")
+        self.assertEqual(request.call_count, 1)
+        return str(caught.exception)
+
+    def test_billing_errors_have_specific_remedies(self):
+        for code, expected in (
+            ("credit_balance_exhausted", "Add credits"),
+            ("organization_spend_limit_exceeded", "organization limits"),
+            ("project_spend_limit_exceeded", "project's limits"),
+            ("organization_usage_limit_exceeded", "higher usage limit"),
+            ("insufficient_quota", "billing"),
+        ):
+            with self.subTest(code=code):
+                body = json.dumps({"error": {"code": code, "type": "insufficient_quota", "message": "private data"}}).encode()
+                message = self.fail_request(body)
+                self.assertIn(code, message)
+                self.assertIn(expected, message)
+                self.assertNotIn("private data", message)
+
+    def test_rate_errors_suggest_waiting(self):
+        for code in ("rate_limit_exceeded", "slow_down"):
+            with self.subTest(code=code):
+                message = self.fail_request(json.dumps({"error": {"code": code}}).encode())
+                self.assertIn("Wait before retrying", message)
+
+    def test_quota_type_is_used_when_code_is_absent(self):
+        self.assertIn("insufficient_quota", self.fail_request(b'{"error":{"type":"insufficient_quota"}}'))
+
+    def test_unknown_codes_and_messages_are_not_exposed(self):
+        message = self.fail_request(b'{"error":{"code":"private-code","message":"private data"}}')
+        self.assertIn("Billing and Limits", message)
+        self.assertNotIn("private-code", message)
+        self.assertNotIn("private data", message)
+
+    def test_malformed_error_response_still_returns_safe_guidance(self):
+        for body in (b"not JSON: private data", b'{"error":null}', b"[]"):
+            with self.subTest(body=body):
+                self.assertIn("Billing and Limits", self.fail_request(body))
 
 
 def call_response(name, args, call_id="call_1"):
