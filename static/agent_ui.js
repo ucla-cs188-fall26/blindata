@@ -41,7 +41,7 @@ function findingButtonLabel(finding) {
     default:
       action = 'Explore this finding and its source evidence.';
   }
-  return `${finding.id}. ${action}`;
+  return `Claim ${finding.id}: ${action}`;
 }
 
 // Delegation also covers finding buttons created after verification.
