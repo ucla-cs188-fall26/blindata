@@ -99,7 +99,7 @@ class EvidenceAgent:
         if status == "missing":
             return "completeness"
         prefix = message.partition(":")[0].strip().lower()
-        return {"trend": "trend", "values": "value", "peak": "maximum",
+        return {"trend": "trend", "values": "value", "peak": "maximum", "minimum": "minimum",
                 "units": "unit"}.get(prefix, "claim")
 
     def _selected(self) -> Finding | None:
@@ -108,7 +108,8 @@ class EvidenceAgent:
     def _find_by_kind(self, text: str) -> Finding | None:
         category = (
             "trend" if re.search(r"trend|increas|decreas|ris|fall|fell|grow", text) else
-            "maximum" if re.search(r"peak|max|min|highest|lowest", text) else
+            "minimum" if re.search(r"minimum|lowest|trough", text) else
+            "maximum" if re.search(r"peak|max|highest", text) else
             "unit" if re.search(r"unit|axis", text) else
             "value" if re.search(r"number|value", text) else
             "completeness" if re.search(r"miss|omit|series", text) else None
@@ -184,11 +185,11 @@ class EvidenceAgent:
                 lines.append("The source file has no unit metadata; units cannot be independently confirmed.")
         elif finding.series:
             rows = self._rows(finding.series)
-            if finding.kind == "maximum":
-                extreme = max(self.series[finding.series])
+            if finding.kind in ("maximum", "minimum"):
+                extreme = (max if finding.kind == "maximum" else min)(self.series[finding.series])
                 labels = [label for label, value in zip(self.labels, self.series[finding.series])
                           if value == extreme]
-                lines.append(f"Source maximum for {finding.series}: {_fmt(extreme)} at {', '.join(labels)}.")
+                lines.append(f"Source {finding.kind} for {finding.series}: {_fmt(extreme)} at {', '.join(labels)}.")
             elif finding.kind == "trend":
                 vals = self.series[finding.series]
                 direction = "rises" if vals[-1] > vals[0] else "falls" if vals[-1] < vals[0] else "is flat"

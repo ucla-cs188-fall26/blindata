@@ -87,6 +87,6 @@ See the [official API error guide](https://developers.openai.com/api/docs/guides
 - A bounded recent dialogue history is kept **in memory** per session and cleared when the local server stops.
 - The model generates natural language and **can still make semantic mistakes**. The numerical guard is an extra check, not a guarantee. Always render the original evidence rows separately, and do not describe LLM narration as independently verified.
 - If the LLM endpoint fails, the client reports an error instead of silently substituting a plausible explanation. Run `BLINDATA_AGENT_MODE=rules` to use explicit offline commands.
-- Checker limitations remain unchanged: endpoint-only trend checks and weak label-to-number association may miss errors. Tool-based `get_trend` does inspect consecutive intervals, but does **not** silently rewrite the official checker verdict.
+- The checker recognizes maximum/minimum synonyms and checks consecutive intervals for continuous/steady trends. Overall trends use endpoints; general label-to-number association and complex language remain limited. See `docs/constraints.md`. Tool-based `get_trend` does **not** silently rewrite the official checker verdict.
 - API access and model permissions vary by account; default `gpt-4.1-mini` can be overridden with `BLINDATA_LLM_MODEL`.
 - The test suite uses simulated Responses API outputs; it does not constitute a live API integration test or a VoiceOver/NVDA user study.

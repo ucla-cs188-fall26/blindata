@@ -14,6 +14,7 @@ function markActivated(button) {
 function findingButtonLabel(finding) {
   const subjects = {
     maximum: 'peak claim',
+    minimum: 'minimum claim',
     trend: 'trend claim',
     value: 'reported number',
     unit: 'stated unit',

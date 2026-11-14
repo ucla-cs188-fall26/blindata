@@ -175,6 +175,183 @@ def find_cue(sentence):
                 return kind, m.group(0)
     return None
 
+MONTH_NAMES = ("january", "february", "march", "april", "may", "june",
+               "july", "august", "september", "october", "november", "december")
+MONTH_ALIASES = {alias: full for full in MONTH_NAMES
+                 for alias in (full, full[:3])}
+MONTH_ALIASES["sept"] = "september"
+NUMBER = r"(?<![\w.])[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?!\w|\.\d)"
+MAX_CUE = r"\b(?:peaks?|peaked|peaking|max|maximum|maxima|highest|largest|greatest|biggest|high point|record high|all-time high|top value|(?:reach(?:es|ed)?|hits?|hit) (?:a |its |the )?high)\b"
+MIN_CUE = r"\b(?:min|minimum|minima|lowest|smallest|fewest|troughs?|bottoms?(?:ed)? out|low point|record low|all-time low|(?:reach(?:es|ed)?|hits?|hit) (?:a |its |the )?low)\b"
+TREND_CUES = {
+    "rises": r"\b(?:ris(?:e[sd]?|ing)|rose|increas(?:e[sd]?|ing)|grow[sn]?|grew|growing|climb(?:s|ed|ing)?|went up|go(?:es|ing)? up|upward(?:s)?|uptrend)\b",
+    "falls": r"\b(?:falls?|fell|fallen|falling|decreas(?:e[sd]?|ing)|declin(?:e[sd]?|ing)|drop(?:s|ped|ping)?|dip(?:s|ped|ping)?|shrink(?:s|ing)?|shrank|shrunk|went down|go(?:es|ing)? down|downward(?:s)?|downtrend)\b",
+    "flat": r"\b(?:flat|stable|constant|unchanged|steady|no change|did not change|does not change|do not change|remain(?:s|ed)? (?:the same|level))\b",
+}
+
+
+def word_pattern(value):
+    return r"(?<!\w)" + re.escape(value) + r"(?!\w)"
+
+
+def label_mentions(text, labels):
+    """Resolve actual categories, including full/abbreviated month spellings."""
+    found = []
+    for index, label in enumerate(labels):
+        canonical = MONTH_ALIASES.get(label.lower().rstrip('.'))
+        aliases = {label.lower()}
+        if canonical:
+            aliases.update(a for a, full in MONTH_ALIASES.items() if full == canonical)
+        for alias in aliases:
+            for match in re.finditer(word_pattern(alias), text):
+                found.append((match.start(), match.end(), index))
+    return sorted(set(found))
+
+
+def claim_clauses(text, labels, series):
+    """Keep series-specific clauses apart; inherit a subject only within a sentence."""
+    names = '|'.join(re.escape(n) for n in sorted(series, key=len, reverse=True))
+    aliases = set(l.lower() for l in labels) | set(MONTH_ALIASES)
+    categories = '|'.join(re.escape(l) for l in sorted(aliases, key=len, reverse=True))
+    separator = (r"\b(?:but|while|whereas)\b|\band\b(?!\s+(?:" + categories + r")\b)"
+                 r"|\bwith\b(?=\s*(?:" + names + r")\b)"
+                 r"|,\s*with\s+(?:a|an)\s+|,(?=\s*(?:" + names + r"|highest|lowest|maximum|minimum|peak|trough)\b)")
+    # A decimal point is part of a number, not a sentence boundary.
+    sentences = re.split(r"(?<!\d)\.(?!\d)|(?<=\d)\.(?=\s|$)|[!?;\n]", text.lower())
+    for sentence in sentences:
+        previous = []
+        pending = []
+        for clause in re.split(separator, sentence):
+            explicit = [n for n in series if re.search(word_pattern(n), clause)]
+            # Preserve a shared subject in "sales and costs are lowest ...".
+            if clause.strip() in series:
+                pending.extend(n for n in explicit if n not in pending)
+                previous = pending[:]
+                continue
+            subjects = explicit or previous
+            if explicit and pending:
+                subjects = list(dict.fromkeys(pending + explicit))
+            pending = []
+            if explicit:
+                previous = subjects
+            if subjects:
+                yield clause.strip(), subjects
+
+
+def is_negated(text):
+    return bool(re.search(r"\b(?:not|never)\b|n['’]t\b", text))
+
+
+def check_language(text, labels, series, f, verified, contradicted, unverifiable):
+    for clause, subjects in claim_clauses(text, labels, series):
+        if not clause:
+            continue
+        # Predictions and hypothetical claims cannot be checked as observations.
+        if re.search(r"\b(?:will|would|could|might|if|expected|forecast\w*|predict\w*)\b", clause):
+            if not find_cue(clause):
+                unverifiable.append(f'The hypothetical claim "{clause}" cannot be confirmed from the data alone.')
+            continue
+        if re.search(r"\b(?:highest|lowest|largest|smallest|greatest|biggest|maximum|minimum)\s+(?:increase|decrease|rise|fall|growth|drop|change)\b|\b(?:increased|decreased|rose|fell|grew|dropped)\s+(?:the\s+)?(?:most|least)\b", clause):
+            unverifiable.append(f'Change: comparing the size of changes in "{clause}" is not supported by this rule.')
+            continue
+        extrema = sorted([(m, 'max') for m in re.finditer(MAX_CUE, clause)] +
+                         [(m, 'min') for m in re.finditer(MIN_CUE, clause)], key=lambda x: x[0].start())
+        if len(subjects) > 1 and len(extrema) > 1:
+            unverifiable.append(f'Extremum: cannot assign the claims in "{clause}" to individual series. '
+                                'State each series claim separately.')
+            continue
+        for i, (cue, kind) in enumerate(extrema):
+            # "Highest increase" describes a change, not the largest data value.
+            tail = clause[cue.end():]
+            if re.match(r"\s+(?:increase|decrease|rise|fall|growth|drop|change)\b", tail):
+                continue
+            end = extrema[i + 1][0].start() if i + 1 < len(extrema) else len(clause)
+            context = clause[cue.end():end]
+            mentions = label_mentions(context, labels)
+            if not mentions and len(extrema) == 1:
+                context = clause
+                mentions = label_mentions(context, labels)
+            indices = set(index for _, _, index in mentions)
+            # Numbers inside category labels (e.g. Q1 or 2026) are not values.
+            numbers = [to_number(m.group()) for m in re.finditer(NUMBER, context)
+                       if not any(start <= m.start() < stop for start, stop, _ in mentions)]
+            if (len(indices) > 1 and not re.search(r'\band\b', context)) or len(set(numbers)) > 1 or not (indices or numbers):
+                unverifiable.append(f'Extremum: cannot identify a single category or value for "{clause}". '
+                                    'State one maximum or minimum claim per clause.')
+                continue
+            for name in subjects:
+                vals = series[name]
+                extreme = f[name][kind][0]
+                winners = [labels[j] for j, value in enumerate(vals) if value == extreme]
+                matches = (not indices or all(vals[j] == extreme for j in indices)) and (
+                    not numbers or abs(numbers[0] - extreme) <= 1e-9)
+                if re.search(r"\b(?:only|sole|unique|uniquely)\b", clause) and len(winners) > 1:
+                    matches = False
+                negated = is_negated(clause[:cue.end()]) or bool(re.match(r"\s+(?:is |was )?not\b", tail))
+                agrees = not matches if negated else matches
+                heading, noun = ('Peak', 'maximum') if kind == 'max' else ('Minimum', 'minimum')
+                statement = f'{heading}: the {noun} claim for {name}'
+                if agrees:
+                    verified.append(f'{statement} matches the data. The {noun} is {extreme:g} at {", ".join(winners)}.')
+                else:
+                    contradicted.append(f'{statement} conflicts with the data. The real {noun} is {extreme:g} at {", ".join(winners)}.')
+
+        # An extremum sentence can include other verbs; avoid mistaking them for trends.
+        if extrema:
+            continue
+        trends = [(direction, m) for direction, pattern in TREND_CUES.items()
+                  for m in re.finditer(pattern, clause)]
+        # "Steady increase" has direction as well as a continuity modifier.
+        directional = [(d, m) for d, m in trends if d != 'flat']
+        if directional:
+            trends = directional
+        if not trends:
+            continue
+        if len(set(d for d, _ in trends)) != 1:
+            unverifiable.append(f'Trend: cannot isolate one trend claim in "{clause}".')
+            continue
+        claimed, cue = trends[0]
+        for name in subjects:
+            vals = series[name]
+            category_indices = list(dict.fromkeys(j for _, _, j in label_mentions(clause, labels)))
+            ranged = bool(re.search(r"\bfrom\b.*\bto\b|\bbetween\b.*\band\b", clause))
+            start, end = 0, len(vals) - 1
+            if ranged and len(category_indices) == 2:
+                start, end = category_indices
+            elif len(category_indices) == 1 and re.search(r'\b(?:in|at|during)\b', clause):
+                end = category_indices[0]
+                if end == 0:
+                    unverifiable.append(f'Trend: no preceding category is available for {name} at {labels[end]}.')
+                    continue
+                start = end - 1
+            elif category_indices:
+                unverifiable.append(f'Trend: cannot resolve the range for {name} in "{clause}". '
+                                    'Use "from <category> to <category>" for a local trend.')
+                continue
+            step = 1 if end >= start else -1
+            points = list(range(start, end + step, step))
+            selected = [vals[j] for j in points]
+            real = 'rises' if selected[-1] > selected[0] else 'falls' if selected[-1] < selected[0] else 'flat'
+            continuous = bool(re.search(r"\b(?:steadily|steady|continuously|consistently|monotonically|throughout)\b|\bevery\s+(?:month|quarter|year|interval)\b", clause))
+            if claimed == 'flat' and not re.search(r"\boverall\b", clause):
+                continuous = True
+            agrees = real == claimed
+            if continuous:
+                differences = [b - a for a, b in zip(selected, selected[1:])]
+                agrees = bool(differences) and all(delta > 0 if claimed == 'rises' else
+                                                 delta < 0 if claimed == 'falls' else delta == 0
+                                                 for delta in differences)
+            # "Did not change" is itself a flat claim, not a negated flat claim.
+            if is_negated(clause[:cue.end()]) and not re.fullmatch(r"(?:no change|(?:did|does|do) not change)", cue.group()):
+                agrees = not agrees
+            detail = (f'From {labels[start]} to {labels[end]}, the data go from {selected[0]:g} '
+                      f'to {selected[-1]:g}.')
+            if continuous:
+                detail += ' Every adjacent pair was checked.'
+            message = f'Trend: the claim for {name} ' + ('matches' if agrees else 'conflicts with') + f' the data. {detail}'
+            (verified if agrees else contradicted).append(message)
+
+
 def check(text, labels, series, f, unit):
     low = text.lower()
     verified, contradicted, unverifiable, missing = [], [], [], []
@@ -193,48 +370,19 @@ def check(text, labels, series, f, unit):
                 contradicted.append(f"Units: the description says {m.group(0)}, "
                                     f"but the chart unit is {unit}.")
 
-    # 2. trend claims like "apples rise/fall ..."
-    for name in series:
-        m = re.search(name + r"\s+(rise|rises|rose|fall|falls|fell|increase|increases|decrease|decreases)", low)
-        if m:
-            claimed = "rises" if m.group(1).startswith(("rise", "rose", "increase")) else "falls"
-            real = f[name]["trend"]
-            if claimed != real:
-                contradicted.append(
-                    f"Trend: the description says {name} {SAY_TREND[claimed]}, but in the data "
-                    f"they {SAY_TREND[real]}, from {f[name]['start']:g} to {f[name]['end']:g}.")
-            else:
-                verified.append(f"Trend: {name} {SAY_TREND[claimed]} overall, which matches the data.")
+    check_language(text, labels, series, f, verified, contradicted, unverifiable)
 
     # 1. numbers must exist in the data (each distinct number reported once)
     allvals = set().union(*[s["values"] for s in f.values()])
     seen = []
-    for num in re.findall(r"\d+(?:\.\d+)?", text):
+    for num in re.findall(NUMBER, text):
         if num in seen:
             continue
         seen.append(num)
-        if float(num) in allvals:
+        if to_number(num) in allvals:
             verified.append(f"Values: the number {num} appears in the data.")
         else:
             contradicted.append(f"Values: the number {num} does not appear anywhere in the data.")
-
-    # 3. peak claims, tied to the series named in the same sentence
-    MONTHS = ["january", "february", "march", "april", "may", "june", "july",
-              "august", "september", "october", "november", "december"]
-    ABBR = {full: full[:3].capitalize() for full in MONTHS}
-    for sent in re.split(r"[.!\n]", low):
-        pm = re.search(r"peak\w*\s+in\s+(\w+)", sent)
-        if not pm:
-            continue
-        month = ABBR.get(pm.group(1), pm.group(1).capitalize())
-        for name in series:
-            if name in sent:
-                real_month, real_val = f[name]["max"][1], f[name]["max"][0]
-                if month != real_month:
-                    contradicted.append(f"Peak: the description puts the {name} peak in {month}, "
-                                        f"but the real maximum is {real_val:g} in {real_month}.")
-                else:
-                    verified.append(f"Peak: {name} peak in {month}, which matches the data.")
 
     # Unverifiable: causal claims, predictions, opinions. Not errors, just
     # things a data table cannot confirm or deny.
@@ -250,7 +398,7 @@ def check(text, labels, series, f, unit):
 
     # 5. completeness: every series mentioned?
     for name in series:
-        if name not in low:
+        if not re.search(word_pattern(name), low):
             missing.append(f"The series {name} is in the data but is never mentioned.")
 
     return dict(verified=verified, contradicted=contradicted,

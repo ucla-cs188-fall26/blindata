@@ -94,6 +94,26 @@ class WebIntegrationTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertIn("error", result)
 
+    def test_lowest_claim_flows_from_checker_to_agent(self):
+        for data, status, evidence in (
+            ("Month,Sales\nJan,100\nFeb,120\nMar,90\nApr,150", "verified", "90 at Mar"),
+            ("Month,Sales\nJan,10\nFeb,14\nMar,18\nApr,27", "contradicted", "10 at Jan"),
+        ):
+            with self.subTest(status=status):
+                code, session = self.request("/api/start", {
+                    "format": "csv", "data": data,
+                    "description": "Sales is the lowest in March.",
+                })
+                self.assertEqual(code, 200, session)
+                finding = session["findings"][0]
+                self.assertEqual(finding["kind"], "minimum")
+                self.assertEqual(finding["status"], status)
+                code, result = self.request("/api/ask", {
+                    "session_id": session["session_id"], "question": f"inspect {finding['id']}",
+                })
+                self.assertEqual(code, 200, result)
+                self.assertIn(f"Source minimum for sales: {evidence}.", result["result"]["answer"])
+
     def test_unknown_session_is_reported(self):
         status, result = self.request("/api/ask", {"session_id": "unknown", "question": "summary"})
         self.assertEqual(status, 404)

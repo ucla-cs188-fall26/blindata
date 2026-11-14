@@ -198,8 +198,9 @@ file-based descriptions as UTF-8 text.
 
 Reports group findings into verified, contradicted, unverifiable, and missing
 items. These are rule-based checks, not a guarantee that every statement is
-correct. For example, the core trend check uses endpoints, while the agent's
-LLM trend tool can inspect adjacent intervals. The core numeric check does not
+correct. For example, overall trends compare endpoints, while continuous/steady trends
+check adjacent intervals. Maximum and minimum claims recognize common synonyms
+and month abbreviations; see [the supported vocabulary](docs/constraints.md). The core numeric check does not
 fully associate each number with its claimed category. Model explanations can
 also be wrong; inspect the original source evidence.
 
