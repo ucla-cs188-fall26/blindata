@@ -1,8 +1,10 @@
 # Constraint checks
 
 The checker compares supported English claims with the supplied chart data.
-It returns verified, contradicted, unverifiable, and missing message buckets.
-No LLM or API key is needed for these checks.
+Reports describe details as consistent with the data, in conflict with the
+data, not assessable from the data, or potentially missing. These are
+rule-based findings, not proof that the full description is correct. No LLM or
+API key is needed for these checks.
 
 ## Maximum and minimum claims
 
@@ -64,9 +66,10 @@ periods. "Steadily" currently checks direction, not equal rates of change.
 ## Other checks
 
 - **Values:** distinct signed numbers, decimals, and comma-grouped values are
-  checked for presence anywhere in the data. In a recognized extreme claim,
-  the stated value must also match the actual extreme. General statements
-  still do not fully bind a number to its claimed series/category.
+  reported as present or absent among the source values, but that check does
+  not verify or contradict the description's claim. A number's series,
+  category, and meaning are not associated. Recognized maximum/minimum claims
+  separately compare a stated extreme value with the actual extreme.
 - **Units:** recognized unit words are compared with available unit metadata
   or the `units` fallback. Arbitrary axis titles, ranges, scale factors, and
   currency conversions are not validated.

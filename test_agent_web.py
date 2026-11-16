@@ -73,8 +73,9 @@ class WebIntegrationTests(unittest.TestCase):
                 status, result = self.start_example(filename)
                 self.assertEqual(status, 200, result)
                 self.assertEqual(result["agent_mode"], "rules")
-                self.assertIn("4 contradicted", result["result"]["answer"])
-                self.assertEqual(len(result["findings"]), 8)
+                self.assertIn("conflicts with data, 3", result["result"]["answer"])
+                self.assertIn("Number presence notes (not claim verification)", result["result"]["answer"])
+                self.assertEqual(len(result["findings"]), 4)
 
     def test_follow_up_returns_original_evidence(self):
         status, session = self.start_example()

@@ -148,15 +148,48 @@ class CheckerLanguageTests(unittest.TestCase):
         self.assert_finding('Sales was unchanged overall.', 'verified', 'Trend', series={'sales': [2, 3, 1, 2]})
         self.assert_finding('Sales is not stable.', 'verified', 'Trend')
 
+    def test_report_uses_evidence_framing(self):
+        output = checker.report('chart.txt', {
+            'verified': ['Trend matches the data.'],
+            'contradicted': ['Peak conflicts with the data.'],
+            'unverifiable': ['The data cannot assess the prediction.'],
+            'missing': ['The series may be missing from the description.'],
+            'number_notes': ['The number 90 appears in the source values.'],
+        })
+        self.assertIn('Consistent details: 1; conflicting details: 1', output)
+        self.assertIn('Details consistent with the data', output)
+        self.assertIn('Details that conflict with the data', output)
+        self.assertIn('Claims the data cannot assess', output)
+        self.assertIn('Number presence notes (not claim verification)', output)
+        self.assertNotIn('verified', output)
+        self.assertNotIn('contradicted', output)
+
+    def test_number_presence_does_not_verify_claim_context(self):
+        labels = ['Jan', 'Feb', 'Mar']
+        series = {'sales': [10, 20, 30]}
+        result = self.check_text('Sales is 10 in February.', labels=labels, series=series)
+        self.assertFalse(result['verified'] or result['contradicted'] or result['unverifiable'], result)
+        self.assertTrue(any('number 10 appears among the source values' in item and
+                            'does not establish that the description uses it correctly' in item
+                            for item in result['number_notes']), result)
+
+        absent = self.check_text('Sales is 99 in February.', labels=labels, series=series)
+        self.assertFalse(absent['verified'] or absent['contradicted'] or absent['unverifiable'], absent)
+        self.assertTrue(any('number 99 was not found among the source values' in item
+                            for item in absent['number_notes']), absent)
+
     def test_original_examples_still_have_expected_verdicts(self):
         examples = Path(__file__).parent / 'examples'
         labels, series, unit = checker.load(examples / 'chart1_data.csv')
         f = checker.facts(labels, series)
         correct = checker.check((examples / 'chart1_description_correct.txt').read_text(), labels, series, f, unit or 'units')
-        self.assertFalse(correct['contradicted'] or correct['unverifiable'] or correct['missing'], correct)
+        self.assertFalse(correct['contradicted'] or correct['missing'], correct)
+        self.assertFalse(correct['unverifiable'], correct)
+        self.assertEqual(len(correct['number_notes']), 5, correct)
         wrong = checker.check((examples / 'chart1_description_wrong.txt').read_text(), labels, series, f, unit or 'units')
-        self.assertEqual(len(wrong['contradicted']), 4, wrong)
+        self.assertEqual(len(wrong['contradicted']), 3, wrong)
         self.assertEqual(len(wrong['unverifiable']), 1, wrong)
+        self.assertEqual(len(wrong['number_notes']), 4, wrong)
 
     def test_agent_explains_minimum_with_minimum_evidence(self):
         series = {'sales': [10, 14, 18, 27]}

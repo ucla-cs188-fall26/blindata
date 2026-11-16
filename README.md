@@ -201,13 +201,16 @@ use numeric values in the remaining series columns. Include at least one data
 row and one series, with a value for every category in every series. Store
 file-based descriptions as UTF-8 text.
 
-Reports group findings into verified, contradicted, unverifiable, and missing
-items. These are rule-based checks, not a guarantee that every statement is
-correct. For example, overall trends compare endpoints, while continuous/steady trends
+Reports describe details that are consistent with or conflict with the supplied
+data, claims the data cannot assess, and potentially missing items. These are
+rule-based checks, not a guarantee that every statement is correct. For example,
+overall trends compare endpoints, while continuous/steady trends
 check adjacent intervals. Maximum and minimum claims recognize common synonyms
 and month abbreviations; see [the supported vocabulary](docs/constraints.md). The core numeric check does not
-fully associate each number with its claimed category. Model explanations can
-also be wrong; inspect the original source evidence.
+associate a number with its claimed series or category: it reports whether the
+number appears among the source values, but does not count that as support or a
+conflict. Model explanations can also be wrong; inspect the original source
+evidence.
 
 ## 8. Run the tests
 

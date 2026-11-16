@@ -177,7 +177,7 @@ class LLMAgentTests(unittest.TestCase):
 
     def test_missing_api_key_keeps_old_rules(self):
         with patch.dict(os.environ, {"BLINDATA_AGENT_MODE": "auto"}, clear=True):
-            self.assertIn("contradicted", self.base.ask("summary")["answer"])
+            self.assertIn("conflicts with data, 2", self.base.ask("summary")["answer"])
         with patch.dict(os.environ, {"BLINDATA_AGENT_MODE": "llm"}, clear=True):
             self.assertIn("requires OPENAI_API_KEY", self.base.ask("summary")["answer"])
 

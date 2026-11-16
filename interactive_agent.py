@@ -63,6 +63,7 @@ class EvidenceAgent:
         self.unit = unit
         self.description = description
         self.buckets = buckets
+        self.number_notes = buckets.get("number_notes", [])
         self.findings: list[Finding] = []
         for status in GROUPS:
             for msg in buckets.get(status, []):
@@ -155,14 +156,23 @@ class EvidenceAgent:
 
     def summary(self) -> dict[str, Any]:
         counts = {name: len(self.buckets.get(name, [])) for name in GROUPS}
-        parts = [f"Verification results: {counts['contradicted']} contradicted; "
-                 f"{counts['missing']} potentially missing; "
-                 f"{counts['unverifiable']} unverifiable; "
-                 f"{counts['verified']} verified."]
+        parts = [f"Data comparison counts: consistent with data, {counts['verified']}; "
+                 f"conflicts with data, {counts['contradicted']}; "
+                 f"cannot assess from data, {counts['unverifiable']}; "
+                 f"potentially missing, {counts['missing']}."]
+        if self.number_notes:
+            parts.append("Number presence notes (not claim verification):")
+            parts.extend(self.number_notes)
         if self.findings:
             parts.append("Findings:")
             for item in self.findings:
-                parts.append(f"{item.id}. [{item.status}] {item.message}")
+                label = {
+                    "verified": "Consistent with the data",
+                    "contradicted": "Conflicts with the data",
+                    "unverifiable": "Cannot be assessed from these data",
+                    "missing": "Potentially missing",
+                }.get(item.status, "Needs review")
+                parts.append(f"{item.id}. {label}. {item.message}")
             parts.append("Ask 'why 1', 'show evidence', 'compare Feb and Mar', or 'corrected description'.")
         else:
             parts.append("No findings were reported. This is not proof that every chart claim is correct.")

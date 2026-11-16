@@ -31,8 +31,9 @@ class EvidenceAgentTests(unittest.TestCase):
 
     def test_summary_reuses_existing_findings(self):
         out = self.agent.ask("summary")
-        self.assertIn("2 contradicted", out["answer"])
-        self.assertIn("1. [contradicted]", out["answer"])
+        self.assertIn("conflicts with data, 2", out["answer"])
+        self.assertIn("1. Conflicts with the data.", out["answer"])
+        self.assertNotIn("[contradicted]", out["answer"])
 
     def test_inspect_has_source_rows(self):
         out = self.agent.ask("why 1")

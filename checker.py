@@ -354,7 +354,7 @@ def check_language(text, labels, series, f, verified, contradicted, unverifiable
 
 def check(text, labels, series, f, unit):
     low = text.lower()
-    verified, contradicted, unverifiable, missing = [], [], [], []
+    verified, contradicted, unverifiable, missing, number_notes = [], [], [], [], []
 
     # 4. units: compare unit words in the description with the chart's unit
     chart_units = [w for w in UNIT_WORDS if re.search(r"\b" + w, unit)]
@@ -372,7 +372,7 @@ def check(text, labels, series, f, unit):
 
     check_language(text, labels, series, f, verified, contradicted, unverifiable)
 
-    # 1. numbers must exist in the data (each distinct number reported once)
+    # 1. Report number presence, but do not treat presence as claim verification.
     allvals = set().union(*[s["values"] for s in f.values()])
     seen = []
     for num in re.findall(NUMBER, text):
@@ -380,9 +380,15 @@ def check(text, labels, series, f, unit):
             continue
         seen.append(num)
         if to_number(num) in allvals:
-            verified.append(f"Values: the number {num} appears in the data.")
+            number_notes.append(
+                f"The number {num} appears among the source values. This only records "
+                "presence; it does not establish that the description uses it correctly."
+            )
         else:
-            contradicted.append(f"Values: the number {num} does not appear anywhere in the data.")
+            number_notes.append(
+                f"The number {num} was not found among the source values. Without matching "
+                "it to a series, category, or transformation, this alone does not establish an error."
+            )
 
     # Unverifiable: causal claims, predictions, opinions. Not errors, just
     # things a data table cannot confirm or deny.
@@ -402,7 +408,7 @@ def check(text, labels, series, f, unit):
             missing.append(f"The series {name} is in the data but is never mentioned.")
 
     return dict(verified=verified, contradicted=contradicted,
-                unverifiable=unverifiable, missing=missing)
+                unverifiable=unverifiable, missing=missing, number_notes=number_notes)
 
 
 # ---------------------------------------------------------------------------
@@ -414,17 +420,22 @@ def plural(n, word, many=None):
 
 def report(title, b):
     v, c, u, m = (len(b[k]) for k in ("verified", "contradicted", "unverifiable", "missing"))
+    number_notes = b.get("number_notes", [])
     lines = [f"Report for {title}.",
-             f"Summary: {plural(v + c + u, 'claim')} checked: {v} verified, {c} contradicted, "
-             f"{u} unverifiable, {plural(m, 'missing item')}."]
-    groups = [("verified", "Verified claims, these agree with the data"),
-              ("contradicted", "Contradicted claims, these disagree with the data"),
-              ("unverifiable", "Unverifiable claims, the data cannot decide these"),
-              ("missing", "Missing items, these are in the data but not in the description")]
+             f"Summary: {plural(v + c + u, 'claim')} compared with the data. "
+             f"Consistent details: {v}; conflicting details: {c}; "
+             f"claims not assessable from these data: {u}; potentially missing items: {m}."]
+    groups = [("verified", "Details consistent with the data"),
+              ("contradicted", "Details that conflict with the data"),
+              ("unverifiable", "Claims the data cannot assess"),
+              ("missing", "Potentially missing items, present in the data but not the description")]
     for key, heading in groups:
         if b[key]:
             lines.append(f"{heading}: {len(b[key])}.")
             lines += b[key]
+    if number_notes:
+        lines.append(f"Number presence notes (not claim verification): {len(number_notes)}.")
+        lines += number_notes
     return "\n".join(lines)
 
 def run(data_file, description_file):
